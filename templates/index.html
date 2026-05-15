@@ -5,18 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Brevix — Premium URL Shortener</title>
 
-  <!-- Fonts: Cormorant Garamond (display) + DM Sans (body) -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
 
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <style>
     /* ── Design tokens ─────────────────────────────────────────── */
     :root {
-      --gold:        #C5A052;
+      --gold:         #C5A052;
       --gold-light:  #D4AF37;
       --gold-dim:    #AA8833;
       --gold-bg:     #FAF6EE;
@@ -134,7 +132,7 @@
     }
     @keyframes slideDown {
       from { opacity: 0; transform: translateY(-10px); }
-      to   { opacity: 1; transform: translateY(0); }
+      to    { opacity: 1; transform: translateY(0); }
     }
 
     /* ── Short URL pill ─────────────────────────────────────────── */
@@ -255,11 +253,9 @@
 
 <body class="relative z-10">
 
-  <!-- ═══════════════════ HEADER ═══════════════════ -->
   <header class="fade-section" style="animation-delay:0.05s">
     <div class="max-w-3xl mx-auto px-6 pt-12 pb-6 text-center">
 
-      <!-- Wordmark -->
       <div class="inline-flex items-center gap-3 mb-8">
         <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
           <rect x="1" y="1" width="26" height="26" rx="5" stroke="#C5A052" stroke-width="1.5"/>
@@ -281,10 +277,8 @@
     </div>
   </header>
 
-  <!-- ═══════════════════ MAIN ═══════════════════ -->
   <main class="max-w-3xl mx-auto px-6 pb-24 space-y-6">
 
-    <!-- ── Shorten Card ─────────────────────────── -->
     <div class="card p-8 fade-section" style="animation-delay:0.15s">
       <label class="display-font text-xs tracking-widest uppercase mb-3 block" style="color:var(--gold-dim)">
         Destination URL
@@ -306,7 +300,6 @@
 
       <p id="shortenError" class="text-xs mt-3 hidden" style="color:#C0392B; font-weight:300;"></p>
 
-      <!-- Result -->
       <div id="resultBox" class="hidden mt-6">
         <div class="gold-rule mb-5"></div>
         <div class="result-reveal">
@@ -326,11 +319,9 @@
       </div>
     </div>
 
-    <!-- ── Analytics Card ──────────────────────── -->
     <div id="analyticsSection" class="hidden fade-section" style="animation-delay:0.05s">
       <div class="card p-8">
 
-        <!-- Lookup bar -->
         <div class="flex gap-3 mb-6">
           <input
             id="analyticsInput"
@@ -344,11 +335,9 @@
 
         <div id="analyticsError" class="text-xs hidden mb-4" style="color:#C0392B; font-weight:300;"></div>
 
-        <!-- Analytics content -->
         <div id="analyticsContent" class="hidden">
           <div class="gold-rule mb-6"></div>
 
-          <!-- Meta -->
           <div class="mb-6">
             <p class="display-font text-xs tracking-widest uppercase mb-1" style="color:var(--gold-dim)">Destination</p>
             <a id="analyticsLongUrl" href="#" target="_blank"
@@ -356,7 +345,6 @@
                style="color:var(--ink-muted); word-break:break-all;"></a>
           </div>
 
-          <!-- Stats row -->
           <div class="grid grid-cols-3 gap-4 mb-8">
             <div class="stat-pill">
               <div id="statClicks" class="stat-value">0</div>
@@ -372,13 +360,11 @@
             </div>
           </div>
 
-          <!-- Country breakdown -->
           <div id="countryBreakdown" class="mb-8 hidden">
             <p class="display-font text-xs tracking-widest uppercase mb-3" style="color:var(--gold-dim)">Country Breakdown</p>
             <div id="countryBars" class="space-y-2"></div>
           </div>
 
-          <!-- Click log -->
           <div id="clickLogSection" class="hidden">
             <p class="display-font text-xs tracking-widest uppercase mb-3" style="color:var(--gold-dim)">Click Log</p>
             <div class="overflow-hidden rounded" style="border:1px solid var(--border)">
@@ -396,7 +382,6 @@
             <p id="clickLogMore" class="text-xs mt-2 text-center hidden" style="color:var(--ink-muted)"></p>
           </div>
 
-          <!-- Empty state -->
           <div id="noClicksMsg" class="hidden text-center py-10">
             <p class="display-font text-3xl font-light mb-2" style="color:var(--gold)">No clicks yet</p>
             <p class="text-sm font-light" style="color:var(--ink-muted)">Share your link to start tracking.</p>
@@ -407,7 +392,6 @@
 
   </main>
 
-  <!-- ═══════════════════ FOOTER ═══════════════════ -->
   <footer class="text-center py-8 fade-section" style="animation-delay:0.3s">
     <div class="gold-rule max-w-xs mx-auto mb-5"></div>
     <p class="text-xs tracking-widest uppercase" style="color:var(--ink-muted); font-weight:300;">
@@ -415,10 +399,8 @@
     </p>
   </footer>
 
-  <!-- Toast -->
   <div id="toast">Copied to clipboard</div>
 
-  <!-- ═══════════════════ JAVASCRIPT ═══════════════════ -->
   <script>
     /* ── State ─────────────────────────────────────── */
     let currentCode = '';
@@ -442,17 +424,8 @@
 
     function formatDate(iso) {
       if (!iso) return '—';
-      const d = new Date(iso + 'Z');
+      const d = new Date(iso);
       return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
-    }
-
-    function formatTs(iso) {
-      if (!iso) return '—';
-      const d = new Date(iso + 'Z');
-      return d.toLocaleString('en-GB', {
-        day:'2-digit', month:'short', year:'numeric',
-        hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false
-      });
     }
 
     /* ── Shorten ───────────────────────────────────── */
@@ -471,24 +444,28 @@
       label.innerHTML = '<span class="spinner"></span>';
 
       try {
-        const res  = await fetch('/shorten', {
+        // FormData use kar rahe hain kyunki backend Form(...) expect kar raha hai
+        const formData = new FormData();
+        formData.append('original_url', url);
+
+        const res = await fetch('/shorten', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ long_url: url }),
+          body: formData
         });
+
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Server error');
 
-        currentCode     = data.short_code;
-        currentShortUrl = data.short_url;
+        currentCode = data.short_url; // Token yahan hai
+        currentShortUrl = window.location.origin + '/' + data.short_url;
 
         const display = $('shortLinkDisplay');
-        display.href        = data.short_url;
-        display.textContent = data.short_url;
+        display.href = currentShortUrl;
+        display.textContent = currentShortUrl;
 
         $('resultBox').classList.remove('hidden');
         $('analyticsSection').classList.remove('hidden');
-        $('analyticsInput').value = data.short_code;
+        $('analyticsInput').value = currentCode;
       } catch (err) {
         setError('shortenError', err.message);
       } finally {
@@ -511,120 +488,39 @@
     }
 
     /* ── Analytics lookup helpers ──────────────────── */
-    function extractCode(input) {
-      input = input.trim();
-      if (!input) return '';
-      // If it looks like a full URL, grab the last path segment
-      try {
-        const u = new URL(input);
-        return u.pathname.replace(/^\//, '').split('/')[0];
-      } catch (_) {
-        return input.split('/').pop();
-      }
-    }
-
     async function lookupAnalytics() {
-      const raw  = $('analyticsInput').value;
-      const code = extractCode(raw);
-      if (!code) { setError('analyticsError', 'Enter a short code or short URL.'); return; }
+      const raw = $('analyticsInput').value.trim();
+      const code = raw.split('/').pop(); // Full URL se code nikalne ke liye
+      if (!code) { setError('analyticsError', 'Enter a short code.'); return; }
       await fetchAnalytics(code);
     }
 
-    $('analyticsInput').addEventListener('keydown', e => {
-      if (e.key === 'Enter') lookupAnalytics();
-    });
-
     async function fetchAnalytics(code) {
-      if (!code) return;
       setError('analyticsError', '');
       $('analyticsContent').classList.add('hidden');
-      $('analyticsSection').classList.remove('hidden');
-      $('analyticsInput').value = code;
 
       try {
-        const res  = await fetch(`/analytics/${encodeURIComponent(code)}`);
+        const res = await fetch(`/api/analytics/${code}`);
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'Not found');
+        if (!res.ok || data.error) throw new Error(data.error || 'Not found');
+        
         renderAnalytics(data);
       } catch (err) {
         setError('analyticsError', err.message);
       }
     }
 
-    /* ── Render analytics ──────────────────────────── */
     function renderAnalytics(data) {
-      $('analyticsLongUrl').href        = data.long_url;
-      $('analyticsLongUrl').textContent = data.long_url;
-
-      $('statClicks').textContent    = data.total_clicks.toLocaleString();
-      $('statCountries').textContent = Object.keys(data.country_breakdown).length;
-      $('statCreated').textContent   = formatDate(data.created_at);
-
-      /* Country bars */
-      const breakdown = $('countryBreakdown');
-      const bars      = $('countryBars');
-      bars.innerHTML  = '';
-
-      const entries = Object.entries(data.country_breakdown)
-                           .sort((a, b) => b[1] - a[1]);
-
-      if (entries.length) {
-        const max = entries[0][1];
-        breakdown.classList.remove('hidden');
-
-        entries.forEach(([label, count]) => {
-          const pct = Math.round((count / max) * 100);
-          bars.insertAdjacentHTML('beforeend', `
-            <div class="flex items-center gap-3">
-              <span class="text-sm font-light w-36 truncate" style="color:var(--ink-muted)">${label}</span>
-              <div class="flex-1 rounded-full overflow-hidden" style="background:var(--alabaster);height:6px;">
-                <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,var(--gold-light),var(--gold));border-radius:100px;"></div>
-              </div>
-              <span class="text-xs font-light" style="color:var(--ink-muted);min-width:24px;text-align:right">${count}</span>
-            </div>
-          `);
-        });
-      } else {
-        breakdown.classList.add('hidden');
-      }
-
-      /* Click log */
-      const logSection = $('clickLogSection');
-      const logBody    = $('clickLogBody');
-      const noClicks   = $('noClicksMsg');
-      logBody.innerHTML = '';
-
-      if (data.clicks.length === 0) {
-        logSection.classList.add('hidden');
-        noClicks.classList.remove('hidden');
-      } else {
-        noClicks.classList.add('hidden');
-        logSection.classList.remove('hidden');
-
-        const MAX_ROWS = 50;
-        const shown    = data.clicks.slice(0, MAX_ROWS);
-
-        shown.forEach((click, i) => {
-          logBody.insertAdjacentHTML('beforeend', `
-            <tr>
-              <td class="font-light" style="color:var(--ink-muted);opacity:0.5">${i + 1}</td>
-              <td style="font-family:'Courier New',monospace;font-size:0.8rem">${formatTs(click.clicked_at)}</td>
-              <td>${click.flag} ${click.country}</td>
-            </tr>
-          `);
-        });
-
-        const more = $('clickLogMore');
-        if (data.clicks.length > MAX_ROWS) {
-          more.textContent = `Showing ${MAX_ROWS} of ${data.clicks.length} clicks`;
-          more.classList.remove('hidden');
-        } else {
-          more.classList.add('hidden');
-        }
-      }
+      $('analyticsLongUrl').href = data.original_url;
+      $('analyticsLongUrl').textContent = data.original_url;
+      $('statClicks').textContent = data.total_clicks;
+      $('statCreated').textContent = formatDate(data.created_at);
+      
+      const geoCount = data.geo_distribution ? Object.keys(data.geo_distribution).length : 0;
+      $('statCountries').textContent = geoCount;
 
       $('analyticsContent').classList.remove('hidden');
-      $('analyticsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      $('analyticsSection').scrollIntoView({ behavior: 'smooth' });
     }
   </script>
 </body>
