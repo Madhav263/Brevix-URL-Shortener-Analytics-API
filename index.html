@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brevix — Premium URL Shortener</title>
+
+  <!-- Fonts: Cormorant Garamond (display) + DM Sans (body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    /* ── Design tokens ─────────────────────────────────────────── */
+    :root {
+      --gold:        #C5A052;
+      --gold-light:  #D4AF37;
+      --gold-dim:    #AA8833;
+      --gold-bg:     #FAF6EE;
+      --cream:       #FDFBF7;
+      --alabaster:   #F5F1EB;
+      --ink:         #1A1714;
+      --ink-muted:   #6B6259;
+      --border:      #E8DECA;
+      --border-gold: #C5A05244;
+      --shadow-gold: 0 4px 32px 0 #C5A05218;
+      --shadow-card: 0 2px 20px 0 #1A171410;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background-color: var(--cream);
+      color: var(--ink);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Grain texture overlay ──────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.4;
+    }
+
+    /* ── Gold rule ──────────────────────────────────────────────── */
+    .gold-rule {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+      opacity: 0.5;
+    }
+
+    /* ── Headline ───────────────────────────────────────────────── */
+    .display-font { font-family: 'Cormorant Garamond', serif; }
+
+    /* ── Input ──────────────────────────────────────────────────── */
+    .url-input {
+      background: #fff;
+      border: 1.5px solid var(--border);
+      border-radius: 4px;
+      color: var(--ink);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.92rem;
+      font-weight: 300;
+      letter-spacing: 0.01em;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .url-input::placeholder { color: #B8AFA4; }
+    .url-input:focus {
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px var(--border-gold);
+    }
+
+    /* ── Primary button ─────────────────────────────────────────── */
+    .btn-gold {
+      background: linear-gradient(135deg, var(--gold-light) 0%, var(--gold) 100%);
+      color: #fff;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 500;
+      font-size: 0.82rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+      box-shadow: 0 2px 12px #C5A05230;
+    }
+    .btn-gold:hover:not(:disabled) {
+      opacity: 0.9;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px #C5A05240;
+    }
+    .btn-gold:active:not(:disabled) { transform: translateY(0); }
+    .btn-gold:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Ghost button ───────────────────────────────────────────── */
+    .btn-ghost {
+      background: transparent;
+      border: 1.5px solid var(--gold);
+      color: var(--gold-dim);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 500;
+      font-size: 0.78rem;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .btn-ghost:hover { background: var(--gold-bg); color: var(--gold); }
+
+    /* ── Card ───────────────────────────────────────────────────── */
+    .card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: var(--shadow-card);
+    }
+
+    /* ── Result reveal ──────────────────────────────────────────── */
+    .result-reveal {
+      animation: slideDown 0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Short URL pill ─────────────────────────────────────────── */
+    .short-pill {
+      background: var(--gold-bg);
+      border: 1px solid var(--border-gold);
+      border-radius: 4px;
+      font-family: 'DM Mono', 'Courier New', monospace;
+      font-size: 1.05rem;
+      color: var(--gold-dim);
+      letter-spacing: 0.04em;
+      word-break: break-all;
+    }
+
+    /* ── Analytics table ────────────────────────────────────────── */
+    .analytics-table th {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 600;
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--gold-dim);
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+    .analytics-table td {
+      padding: 10px 14px;
+      font-size: 0.84rem;
+      font-weight: 300;
+      color: var(--ink-muted);
+      border-bottom: 1px solid var(--alabaster);
+      vertical-align: middle;
+    }
+    .analytics-table tr:last-child td { border-bottom: none; }
+    .analytics-table tr:hover td { background: var(--cream); }
+
+    /* ── Stat pill ──────────────────────────────────────────────── */
+    .stat-pill {
+      background: var(--gold-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      text-align: center;
+      padding: 18px 24px;
+    }
+    .stat-value {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2.4rem;
+      font-weight: 500;
+      color: var(--gold);
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 0.72rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+      margin-top: 4px;
+    }
+
+    /* ── Badge ──────────────────────────────────────────────────── */
+    .badge {
+      display: inline-block;
+      background: var(--gold-bg);
+      border: 1px solid var(--border);
+      color: var(--ink-muted);
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 100px;
+    }
+
+    /* ── Spinner ────────────────────────────────────────────────── */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Toast ──────────────────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 32px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--ink);
+      color: #FAF6EE;
+      font-size: 0.82rem;
+      letter-spacing: 0.04em;
+      padding: 10px 22px;
+      border-radius: 100px;
+      box-shadow: 0 8px 32px #1A171440;
+      transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), opacity 0.3s;
+      opacity: 0;
+      z-index: 1000;
+      white-space: nowrap;
+    }
+    #toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    /* ── Scrollbar ──────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+    /* ── Section fade-in ────────────────────────────────────────── */
+    .fade-section {
+      opacity: 0;
+      animation: fadeIn 0.7s ease forwards;
+    }
+    @keyframes fadeIn { to { opacity: 1; } }
+  </style>
+</head>
+
+<body class="relative z-10">
+
+  <!-- ═══════════════════ HEADER ═══════════════════ -->
+  <header class="fade-section" style="animation-delay:0.05s">
+    <div class="max-w-3xl mx-auto px-6 pt-12 pb-6 text-center">
+
+      <!-- Wordmark -->
+      <div class="inline-flex items-center gap-3 mb-8">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="26" height="26" rx="5" stroke="#C5A052" stroke-width="1.5"/>
+          <path d="M8 14 L13 9 L13 12 L20 12 L20 16 L13 16 L13 19 Z" fill="#C5A052"/>
+        </svg>
+        <span class="display-font text-2xl font-light tracking-widest" style="color:var(--ink)">BREVIX</span>
+        <span class="badge">v1.0</span>
+      </div>
+
+      <div class="gold-rule max-w-xs mx-auto mb-8"></div>
+
+      <h1 class="display-font text-5xl font-light leading-tight mb-4" style="color:var(--ink)">
+        Shorten. Share.<br/>
+        <em class="font-light" style="color:var(--gold)">Understand.</em>
+      </h1>
+      <p class="text-sm font-light tracking-wide" style="color:var(--ink-muted); max-width:380px; margin:0 auto;">
+        A precision URL shortening tool with real-time click analytics, geolocation insights, and an obsessively clean interface.
+      </p>
+    </div>
+  </header>
+
+  <!-- ═══════════════════ MAIN ═══════════════════ -->
+  <main class="max-w-3xl mx-auto px-6 pb-24 space-y-6">
+
+    <!-- ── Shorten Card ─────────────────────────── -->
+    <div class="card p-8 fade-section" style="animation-delay:0.15s">
+      <label class="display-font text-xs tracking-widest uppercase mb-3 block" style="color:var(--gold-dim)">
+        Destination URL
+      </label>
+
+      <div class="flex gap-3">
+        <input
+          id="longUrlInput"
+          type="text"
+          placeholder="https://your-very-long-url.com/goes/here"
+          class="url-input flex-1 px-4 py-3"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button id="shortenBtn" class="btn-gold px-6 py-3 flex items-center gap-2" onclick="shortenUrl()">
+          <span id="shortenBtnLabel">Shorten</span>
+        </button>
+      </div>
+
+      <p id="shortenError" class="text-xs mt-3 hidden" style="color:#C0392B; font-weight:300;"></p>
+
+      <!-- Result -->
+      <div id="resultBox" class="hidden mt-6">
+        <div class="gold-rule mb-5"></div>
+        <div class="result-reveal">
+          <p class="display-font text-xs tracking-widest uppercase mb-2" style="color:var(--gold-dim)">Your Short Link</p>
+          <div class="flex items-center gap-3 flex-wrap">
+            <a id="shortLinkDisplay" href="#" target="_blank" class="short-pill px-4 py-2 flex-1 block hover:underline underline-offset-2"></a>
+            <button onclick="copyLink()" class="btn-ghost px-4 py-2 flex items-center gap-1.5">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+            <button onclick="fetchAnalytics(currentCode)" class="btn-ghost px-4 py-2 flex items-center gap-1.5">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              Analytics
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Analytics Card ──────────────────────── -->
+    <div id="analyticsSection" class="hidden fade-section" style="animation-delay:0.05s">
+      <div class="card p-8">
+
+        <!-- Lookup bar -->
+        <div class="flex gap-3 mb-6">
+          <input
+            id="analyticsInput"
+            type="text"
+            placeholder="Enter short code or full short URL…"
+            class="url-input flex-1 px-4 py-3"
+            spellcheck="false"
+          />
+          <button class="btn-gold px-6 py-3" onclick="lookupAnalytics()">Lookup</button>
+        </div>
+
+        <div id="analyticsError" class="text-xs hidden mb-4" style="color:#C0392B; font-weight:300;"></div>
+
+        <!-- Analytics content -->
+        <div id="analyticsContent" class="hidden">
+          <div class="gold-rule mb-6"></div>
+
+          <!-- Meta -->
+          <div class="mb-6">
+            <p class="display-font text-xs tracking-widest uppercase mb-1" style="color:var(--gold-dim)">Destination</p>
+            <a id="analyticsLongUrl" href="#" target="_blank"
+               class="text-sm font-light hover:underline underline-offset-2"
+               style="color:var(--ink-muted); word-break:break-all;"></a>
+          </div>
+
+          <!-- Stats row -->
+          <div class="grid grid-cols-3 gap-4 mb-8">
+            <div class="stat-pill">
+              <div id="statClicks" class="stat-value">0</div>
+              <div class="stat-label">Total Clicks</div>
+            </div>
+            <div class="stat-pill">
+              <div id="statCountries" class="stat-value">0</div>
+              <div class="stat-label">Countries</div>
+            </div>
+            <div class="stat-pill">
+              <div id="statCreated" class="stat-value text-2xl">—</div>
+              <div class="stat-label">Created</div>
+            </div>
+          </div>
+
+          <!-- Country breakdown -->
+          <div id="countryBreakdown" class="mb-8 hidden">
+            <p class="display-font text-xs tracking-widest uppercase mb-3" style="color:var(--gold-dim)">Country Breakdown</p>
+            <div id="countryBars" class="space-y-2"></div>
+          </div>
+
+          <!-- Click log -->
+          <div id="clickLogSection" class="hidden">
+            <p class="display-font text-xs tracking-widest uppercase mb-3" style="color:var(--gold-dim)">Click Log</p>
+            <div class="overflow-hidden rounded" style="border:1px solid var(--border)">
+              <table class="analytics-table w-full">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Timestamp (UTC)</th>
+                    <th>Country</th>
+                  </tr>
+                </thead>
+                <tbody id="clickLogBody"></tbody>
+              </table>
+            </div>
+            <p id="clickLogMore" class="text-xs mt-2 text-center hidden" style="color:var(--ink-muted)"></p>
+          </div>
+
+          <!-- Empty state -->
+          <div id="noClicksMsg" class="hidden text-center py-10">
+            <p class="display-font text-3xl font-light mb-2" style="color:var(--gold)">No clicks yet</p>
+            <p class="text-sm font-light" style="color:var(--ink-muted)">Share your link to start tracking.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ═══════════════════ FOOTER ═══════════════════ -->
+  <footer class="text-center py-8 fade-section" style="animation-delay:0.3s">
+    <div class="gold-rule max-w-xs mx-auto mb-5"></div>
+    <p class="text-xs tracking-widest uppercase" style="color:var(--ink-muted); font-weight:300;">
+      Brevix &mdash; Precision Link Intelligence
+    </p>
+  </footer>
+
+  <!-- Toast -->
+  <div id="toast">Copied to clipboard</div>
+
+  <!-- ═══════════════════ JAVASCRIPT ═══════════════════ -->
+  <script>
+    /* ── State ─────────────────────────────────────── */
+    let currentCode = '';
+    let currentShortUrl = '';
+
+    /* ── Utility ───────────────────────────────────── */
+    const $ = id => document.getElementById(id);
+
+    function showToast(msg = 'Copied to clipboard') {
+      const t = $('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2200);
+    }
+
+    function setError(elId, msg) {
+      const el = $(elId);
+      if (msg) { el.textContent = msg; el.classList.remove('hidden'); }
+      else      { el.classList.add('hidden'); }
+    }
+
+    function formatDate(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso + 'Z');
+      return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+    }
+
+    function formatTs(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso + 'Z');
+      return d.toLocaleString('en-GB', {
+        day:'2-digit', month:'short', year:'numeric',
+        hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false
+      });
+    }
+
+    /* ── Shorten ───────────────────────────────────── */
+    async function shortenUrl() {
+      const input = $('longUrlInput');
+      const btn   = $('shortenBtn');
+      const label = $('shortenBtnLabel');
+      const url   = input.value.trim();
+
+      setError('shortenError', '');
+      $('resultBox').classList.add('hidden');
+
+      if (!url) { setError('shortenError', 'Please paste a URL above.'); return; }
+
+      btn.disabled = true;
+      label.innerHTML = '<span class="spinner"></span>';
+
+      try {
+        const res  = await fetch('/shorten', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ long_url: url }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Server error');
+
+        currentCode     = data.short_code;
+        currentShortUrl = data.short_url;
+
+        const display = $('shortLinkDisplay');
+        display.href        = data.short_url;
+        display.textContent = data.short_url;
+
+        $('resultBox').classList.remove('hidden');
+        $('analyticsSection').classList.remove('hidden');
+        $('analyticsInput').value = data.short_code;
+      } catch (err) {
+        setError('shortenError', err.message);
+      } finally {
+        btn.disabled = false;
+        label.textContent = 'Shorten';
+      }
+    }
+
+    /* Allow Enter key to shorten */
+    $('longUrlInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') shortenUrl();
+    });
+
+    /* ── Copy ──────────────────────────────────────── */
+    function copyLink() {
+      if (!currentShortUrl) return;
+      navigator.clipboard.writeText(currentShortUrl)
+        .then(() => showToast('Copied to clipboard ✓'))
+        .catch(() => showToast('Copy failed — please copy manually'));
+    }
+
+    /* ── Analytics lookup helpers ──────────────────── */
+    function extractCode(input) {
+      input = input.trim();
+      if (!input) return '';
+      // If it looks like a full URL, grab the last path segment
+      try {
+        const u = new URL(input);
+        return u.pathname.replace(/^\//, '').split('/')[0];
+      } catch (_) {
+        return input.split('/').pop();
+      }
+    }
+
+    async function lookupAnalytics() {
+      const raw  = $('analyticsInput').value;
+      const code = extractCode(raw);
+      if (!code) { setError('analyticsError', 'Enter a short code or short URL.'); return; }
+      await fetchAnalytics(code);
+    }
+
+    $('analyticsInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') lookupAnalytics();
+    });
+
+    async function fetchAnalytics(code) {
+      if (!code) return;
+      setError('analyticsError', '');
+      $('analyticsContent').classList.add('hidden');
+      $('analyticsSection').classList.remove('hidden');
+      $('analyticsInput').value = code;
+
+      try {
+        const res  = await fetch(`/analytics/${encodeURIComponent(code)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Not found');
+        renderAnalytics(data);
+      } catch (err) {
+        setError('analyticsError', err.message);
+      }
+    }
+
+    /* ── Render analytics ──────────────────────────── */
+    function renderAnalytics(data) {
+      $('analyticsLongUrl').href        = data.long_url;
+      $('analyticsLongUrl').textContent = data.long_url;
+
+      $('statClicks').textContent    = data.total_clicks.toLocaleString();
+      $('statCountries').textContent = Object.keys(data.country_breakdown).length;
+      $('statCreated').textContent   = formatDate(data.created_at);
+
+      /* Country bars */
+      const breakdown = $('countryBreakdown');
+      const bars      = $('countryBars');
+      bars.innerHTML  = '';
+
+      const entries = Object.entries(data.country_breakdown)
+                           .sort((a, b) => b[1] - a[1]);
+
+      if (entries.length) {
+        const max = entries[0][1];
+        breakdown.classList.remove('hidden');
+
+        entries.forEach(([label, count]) => {
+          const pct = Math.round((count / max) * 100);
+          bars.insertAdjacentHTML('beforeend', `
+            <div class="flex items-center gap-3">
+              <span class="text-sm font-light w-36 truncate" style="color:var(--ink-muted)">${label}</span>
+              <div class="flex-1 rounded-full overflow-hidden" style="background:var(--alabaster);height:6px;">
+                <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,var(--gold-light),var(--gold));border-radius:100px;"></div>
+              </div>
+              <span class="text-xs font-light" style="color:var(--ink-muted);min-width:24px;text-align:right">${count}</span>
+            </div>
+          `);
+        });
+      } else {
+        breakdown.classList.add('hidden');
+      }
+
+      /* Click log */
+      const logSection = $('clickLogSection');
+      const logBody    = $('clickLogBody');
+      const noClicks   = $('noClicksMsg');
+      logBody.innerHTML = '';
+
+      if (data.clicks.length === 0) {
+        logSection.classList.add('hidden');
+        noClicks.classList.remove('hidden');
+      } else {
+        noClicks.classList.add('hidden');
+        logSection.classList.remove('hidden');
+
+        const MAX_ROWS = 50;
+        const shown    = data.clicks.slice(0, MAX_ROWS);
+
+        shown.forEach((click, i) => {
+          logBody.insertAdjacentHTML('beforeend', `
+            <tr>
+              <td class="font-light" style="color:var(--ink-muted);opacity:0.5">${i + 1}</td>
+              <td style="font-family:'Courier New',monospace;font-size:0.8rem">${formatTs(click.clicked_at)}</td>
+              <td>${click.flag} ${click.country}</td>
+            </tr>
+          `);
+        });
+
+        const more = $('clickLogMore');
+        if (data.clicks.length > MAX_ROWS) {
+          more.textContent = `Showing ${MAX_ROWS} of ${data.clicks.length} clicks`;
+          more.classList.remove('hidden');
+        } else {
+          more.classList.add('hidden');
+        }
+      }
+
+      $('analyticsContent').classList.remove('hidden');
+      $('analyticsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  </script>
+</body>
+</html>
