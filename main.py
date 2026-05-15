@@ -1,239 +1,140 @@
-"""
-URL Shortener & Analytics API
-A production-ready FastAPI application with SQLite backend.
-Optimized for production deployment and clean architectural design.
-"""
-
-import sqlite3
+import os
 import string
 import random
-import os
-from datetime import datetime, timezone
-from contextlib import asynccontextmanager
-
-from fastapi import FastAPI, HTTPException, Request
+import sqlite3
+import httpx
+from datetime import datetime
+from fastapi import FastAPI, Request, HTTPException, Form
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
+app = FastAPI()
 
-# Use environment variable for DB path in production to persist volume state
-DB_PATH = os.getenv("DATABASE_URL", "urls.db")
-BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
-SHORT_CODE_LENGTH = 7
+# --- RENDER PATH FIX ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
-# Simulated countries for global analytics analytics distribution
-SIMULATED_COUNTRIES = [
-    ("United States", "🇺🇸", 35),
-    ("India", "🇮🇳", 18),
-    ("United Kingdom", "🇬🇧", 10),
-    ("Germany", "🇩🇪", 7),
-    ("Canada", "🇨🇦", 6),
-    ("Australia", "🇦🇺", 5),
-    ("France", "🇫🇷", 4),
-    ("Brazil", "🇧🇷", 4),
-    ("Japan", "🇯🇵", 3),
-    ("Netherlands", "🇳🇱", 3),
-    ("Singapore", "🇸🇬", 2),
-    ("Mexico", "🇲🇽", 2),
-    ("South Korea", "🇰🇷", 1),
-]
+# Database setup
+DATABASE_URL = os.getenv("DATABASE_URL", "urls.db")
 
-# ---------------------------------------------------------------------------
-# Database Helpers
-# ---------------------------------------------------------------------------
-
-def get_db() -> sqlite3.Connection:
-    """Return a SQLite connection with row_factory set for dict-like access."""
-    conn = sqlite3.connect(DB_PATH)
+def get_db_conn():
+    conn = sqlite3.connect(DATABASE_URL)
     conn.row_factory = sqlite3.Row
     return conn
 
-
-def init_db() -> None:
-    """Create structural tables securely if they don't already exist."""
-    with get_db() as conn:
+def init_db():
+    with get_db_conn() as conn:
+        # Table for URLs
         conn.execute("""
             CREATE TABLE IF NOT EXISTS urls (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                short_code  TEXT UNIQUE NOT NULL,
-                long_url    TEXT NOT NULL,
-                created_at  TEXT NOT NULL
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                original_url TEXT NOT NULL,
+                short_code TEXT UNIQUE NOT NULL,
+                clicks INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        # Table for Detailed Analytics
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS clicks (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                short_code  TEXT NOT NULL,
-                clicked_at  TEXT NOT NULL,
-                country     TEXT NOT NULL,
-                flag        TEXT NOT NULL,
-                FOREIGN KEY (short_code) REFERENCES urls(short_code)
+            CREATE TABLE IF NOT EXISTS analytics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                short_code TEXT,
+                click_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                country TEXT,
+                browser TEXT,
+                FOREIGN KEY (short_code) REFERENCES urls (short_code)
             )
         """)
-        conn.commit()
+    print("Database initialized with full analytics support.")
 
+init_db()
 
-# ---------------------------------------------------------------------------
-# Utility Functions
-# ---------------------------------------------------------------------------
+# Helper to generate unique short tokens
+def generate_short_code(length=7):
+    chars = string.ascii_letters + string.digits
+    return ''.join(random.choice(chars) for _ in range(length))
 
-def generate_short_code(length: int = SHORT_CODE_LENGTH) -> str:
-    """Generate a random cryptographic base-62 short code."""
-    alphabet = string.ascii_letters + string.digits
-    return "".join(random.choices(alphabet, k=length))
+# --- ROUTES ---
 
-
-def weighted_country() -> tuple[str, str]:
-    """Pick a simulated country based on realistic application traffic weights."""
-    population = [c[2] for c in SIMULATED_COUNTRIES]
-    choice = random.choices(SIMULATED_COUNTRIES, weights=population, k=1)[0]
-    return choice[0], choice[1]
-
-
-# ---------------------------------------------------------------------------
-# Lifespan Lifecycle
-# ---------------------------------------------------------------------------
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Setup database layout on startup execution
-    init_db()
-    yield
-
-
-# ---------------------------------------------------------------------------
-# App Initialization & Templates
-# ---------------------------------------------------------------------------
-
-app = FastAPI(
-    title="URL Shortener & Analytics API",
-    description="Production-grade URL Shortening system exposing precise analytical metrics.",
-    version="1.0.0",
-    lifespan=lifespan,
-)
-
-# Initialize template handling mechanism
-templates = Jinja2Templates(directory="templates")
-
-
-# ---------------------------------------------------------------------------
-# API Routing Context
-# ---------------------------------------------------------------------------
-
-@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/", response_class=HTMLResponse)
 async def serve_frontend(request: Request):
-    """Serve the single-page application dashboard interface."""
-    return templates.TemplateResponse("index.html", {"request": request, "base_url": BASE_URL.rstrip('/')})
+    # Pass the actual base URL of the deployment to the frontend
+    return templates.TemplateResponse("index.html", {
+        "request": request, 
+        "base_url": str(request.base_url).rstrip('/')
+    })
 
-
-@app.post("/shorten", tags=["URL Shortener"])
-async def shorten_url(request: Request):
-    """
-    Accept a long URL string and map it to a deterministic unique base-62 short reference string.
-    - Eliminates redundancy via lookup validation mapping.
-    - Auto-injects explicit transport schemas if unassigned.
-    """
-    body = await request.json()
-    long_url = body.get("long_url", "").strip()
+@app.post("/shorten")
+async def shorten_url(original_url: str = Form(...)):
+    if not original_url.startswith(("http://", "https://")):
+        original_url = "https://" + original_url
     
-    if not long_url:
-        raise HTTPException(status_code=422, detail="long_url must not be empty.")
-
-    if not long_url.startswith(("http://", "https://")):
-        long_url = "https://" + long_url
-
-    with get_db() as conn:
-        existing = conn.execute(
-            "SELECT short_code, created_at FROM urls WHERE long_url = ?", (long_url,)
-        ).fetchone()
-
+    with get_db_conn() as conn:
+        # Check if URL already exists to save space
+        existing = conn.execute("SELECT short_code FROM urls WHERE original_url = ?", (original_url,)).fetchone()
         if existing:
-            short_code = existing["short_code"]
-            created_at = existing["created_at"]
-        else:
-            # Collision prevention logic sequence handling
-            for _ in range(10):
-                short_code = generate_short_code()
-                clash = conn.execute(
-                    "SELECT 1 FROM urls WHERE short_code = ?", (short_code,)
-                ).fetchone()
-                if not clash:
-                    break
-            else:
-                raise HTTPException(status_code=500, detail="Could not resolve unique token collision.")
-
-            created_at = datetime.now(timezone.utc).isoformat()
-            conn.execute(
-                "INSERT INTO urls (short_code, long_url, created_at) VALUES (?, ?, ?)",
-                (short_code, long_url, created_at),
-            )
+            return {"short_url": existing["short_code"]}
+        
+        short_code = generate_short_code()
+        try:
+            conn.execute("INSERT INTO urls (original_url, short_code) VALUES (?, ?)", (original_url, short_code))
             conn.commit()
+        except sqlite3.IntegrityError:
+            short_code = generate_short_code() # Retry once on collision
+            conn.execute("INSERT INTO urls (original_url, short_code) VALUES (?, ?)", (original_url, short_code))
+            conn.commit()
+    
+    return {"short_url": short_code}
 
-    clean_base = BASE_URL.rstrip('/')
-    return {
-        "short_code": short_code,
-        "short_url": f"{clean_base}/{short_code}",
-        "long_url": long_url,
-        "created_at": created_at,
-    }
+@app.get("/{short_code}")
+async def redirect_url(short_code: str, request: Request):
+    with get_db_conn() as conn:
+        url_data = conn.execute("SELECT original_url FROM urls WHERE short_code = ?", (short_code,)).fetchone()
+        if not url_data:
+            raise HTTPException(status_code=404, detail="Brevix Link not found")
+        
+        # --- Advanced Telemetry ---
+        user_agent = request.headers.get("user-agent", "Unknown")
+        client_ip = request.headers.get("x-forwarded-for", request.client.host)
+        
+        country = "International"
+        try:
+            # Async call to get country from IP
+            async with httpx.AsyncClient() as client:
+                res = await client.get(f"https://ipapi.co/{client_ip.split(',')[0]}/country_name/", timeout=1.5)
+                if res.status_code == 200:
+                    country = res.text
+        except:
+            pass
 
-
-@app.get("/{short_code}", include_in_schema=False)
-async def redirect_url(short_code: str):
-    """Resolve short code token mapping, record telemetry tracking logs, and execute 302 redirection."""
-    if short_code in ("favicon.ico", "robots.txt"):
-        raise HTTPException(status_code=404)
-
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT long_url FROM urls WHERE short_code = ?", (short_code,)
-        ).fetchone()
-
-        if not row:
-            raise HTTPException(status_code=404, detail=f"Short code assignment matching token '{short_code}' not found.")
-
-        country, flag = weighted_country()
-        conn.execute(
-            "INSERT INTO clicks (short_code, clicked_at, country, flag) VALUES (?, ?, ?, ?)",
-            (short_code, datetime.now(timezone.utc).isoformat(), country, flag),
-        )
+        # Update stats
+        conn.execute("UPDATE urls SET clicks = clicks + 1 WHERE short_code = ?", (short_code,))
+        conn.execute("INSERT INTO analytics (short_code, country, browser) VALUES (?, ?, ?)", 
+                     (short_code, country, user_agent[:50]))
         conn.commit()
+        
+        return RedirectResponse(url=url_data["original_url"])
 
-    return RedirectResponse(url=row["long_url"], status_code=302)
-
-
-@app.get("/analytics/{short_code}", tags=["Analytics"])
+@app.get("/api/analytics/{short_code}")
 async def get_analytics(short_code: str):
-    """Retrieve fine-grained evaluation metrics data and telemetry logs for localized short codes."""
-    with get_db() as conn:
-        url_row = conn.execute(
-            "SELECT long_url, created_at FROM urls WHERE short_code = ?", (short_code,)
-        ).fetchone()
-
-        if not url_row:
-            raise HTTPException(status_code=404, detail=f"Target short code sequence metadata '{short_code}' not found.")
-
-        click_rows = conn.execute(
-            "SELECT clicked_at, country, flag FROM clicks WHERE short_code = ? ORDER BY clicked_at DESC",
-            (short_code,),
-        ).fetchall()
-
-    clicks = [{"clicked_at": r["clicked_at"], "country": r["country"], "flag": r["flag"]} for r in click_rows]
-
-    # Dynamically build historical metric distributions mappings
-    country_breakdown = {}
-    for c in clicks:
-        label = f"{c['flag']} {c['country']}"
-        country_breakdown[label] = country_breakdown.get(label, 0) + 1
-
-    return {
-        "short_code": short_code,
-        "long_url": url_row["long_url"],
-        "total_clicks": len(clicks),
-        "created_at": url_row["created_at"],
-        "clicks": clicks,
-        "country_breakdown": country_breakdown,
-    }
+    with get_db_conn() as conn:
+        url_info = conn.execute("SELECT original_url, clicks, created_at FROM urls WHERE short_code = ?", (short_code,)).fetchone()
+        if not url_info:
+            return {"error": "Link not found in Brevix database"}
+        
+        # Get country distribution
+        geo_data = conn.execute("""
+            SELECT country, COUNT(*) as count 
+            FROM analytics 
+            WHERE short_code = ? 
+            GROUP BY country 
+            ORDER BY count DESC
+        """, (short_code,)).fetchall()
+        
+        return {
+            "original_url": url_info["original_url"],
+            "total_clicks": url_info["clicks"],
+            "created_at": url_info["created_at"],
+            "geo_distribution": {row["country"]: row["count"] for row in geo_data}
+        }
